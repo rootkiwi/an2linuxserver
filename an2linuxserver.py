@@ -691,7 +691,7 @@ def init():
     if os.environ.get('XDG_CONFIG_HOME') is None or os.environ.get('XDG_CONFIG_HOME') == '':
         XDG_CONFIG_HOME = os.path.join(os.path.expanduser('~'), '.config')
     else:
-        XDG_CONFIG_HOME = os.path.join(os.environ.get('XDG_CONFIG_HOME'), '.config')
+        XDG_CONFIG_HOME = os.environ.get('XDG_CONFIG_HOME')
 
     CONF_DIR_PATH = os.path.join(XDG_CONFIG_HOME, 'an2linux')
     CONF_FILE_PATH = os.path.join(CONF_DIR_PATH, 'config')
