@@ -369,7 +369,7 @@ class BluetoothHandler:
         try:
             self.do_handshake()
         except ssl.SSLError as ssle:
-            BluetoothHandler.active_pairing_connection = True
+            BluetoothHandler.active_pairing_connection = False
             print_with_timestamp('(Bluetooth) Failed TLS handshake pair_request: {}'.format(ssle))
             return
 
@@ -381,7 +381,6 @@ class BluetoothHandler:
         client_cert_size = struct.unpack('>I', recvall(self.socket, 4))[0]
         client_cert_encrypted = recvall(self.socket, client_cert_size)
         client_cert = self.tls_decrypt(client_cert_encrypted)
-
 
         sha1 = hashlib.sha1(client_cert + SERVER_CERT_DER).hexdigest().upper()
         sha1_format = [sha1[x:x + 2] for x in range(0, len(sha1), 2)]
