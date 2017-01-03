@@ -85,14 +85,17 @@ that maybe you should try something similar.
 #### Edit file:
 */usr/lib/systemd/system/bluetooth.service*
 
-#### Change:
+#### Make the changes in an override file:
 ```
-ExecStart=/usr/lib/bluetooth/bluetoothd
+systemctl edit bluetooth.service
 ```
 
-#### to:
-```
+#### Add the following lines:
+````
+[Service]
+ExecStart=
 ExecStart=/usr/lib/bluetooth/bluetoothd -C
+ExecPost=/bin/chmod 662 /var/run/sdp
 ```
 
 #### then apply changes:
@@ -100,17 +103,6 @@ ExecStart=/usr/lib/bluetooth/bluetoothd -C
 systemctl daemon-reload
 systemctl restart bluetooth.service
 ```
-
-#### and lastly:
-```
-chmod 662 /var/run/sdp
-```
-
-After every update of bluez you need to change *bluetooth.service* and
-also after every reboot you need to change permissions for */var/run/sdp*.
-You could probably do some scripting for this.
-
-I'm not sure if there is a better way to do this, most likely there is.
 
 More info about this problem:
 https://bbs.archlinux.org/viewtopic.php?id=201672.
