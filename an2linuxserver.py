@@ -35,6 +35,7 @@ import configparser
 import struct
 import tempfile
 import socketserver
+import socket
 import signal
 import shutil
 import time
@@ -251,6 +252,14 @@ class TCPHandler(socketserver.BaseRequestHandler):
                 Notification(title, message, hashlib.sha1(title.encode() + message.encode()).digest()).show()
         else:
             Notification(title, message, hashlib.sha1(title.encode() + message.encode()).digest()).show()
+
+
+class ThreadingDualStackServer(socketserver.ThreadingTCPServer):
+    address_family = socket.AF_INET6
+
+    def server_bind(self):
+        self.socket.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
+        super().server_bind()
 
 
 class ThreadingBluetoothServer:
@@ -755,7 +764,12 @@ if __name__ == '__main__':
     notif_tls_ctx.verify_mode = ssl.CERT_REQUIRED
 
     if tcp_server_enabled:
-        tcp_server = socketserver.ThreadingTCPServer(("", tcp_port_number), TCPHandler)
+        try:
+            # test if ipv4/ipv6 dual stacking is supported, otherwise use ipv4
+            tcp_server = ThreadingDualStackServer(('', tcp_port_number), TCPHandler)
+        except Exception:
+            print_with_timestamp('(TCP) Failed to use IPv4/IPv6 dual stacking, fallbacks to IPv4 only')
+            tcp_server = socketserver.ThreadingTCPServer(('', tcp_port_number), TCPHandler)
         print_with_timestamp('(TCP) Waiting for connections on port {}'.format(tcp_port_number))
         threading.Thread(target=tcp_server.serve_forever).start()
 
