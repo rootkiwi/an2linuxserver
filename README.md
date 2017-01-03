@@ -95,7 +95,7 @@ systemctl edit bluetooth.service
 [Service]
 ExecStart=
 ExecStart=/usr/lib/bluetooth/bluetoothd -C
-ExecPost=/bin/chmod 662 /var/run/sdp
+ExecStartPost=/bin/chmod 662 /var/run/sdp
 ```
 
 #### then apply changes:
