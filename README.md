@@ -46,6 +46,12 @@ Arch: python-pip
 Debian / Ubuntu: python3-pip
 ```
 
+* **BlueZ dev files**
+```
+Arch: bluez-libs
+Debian / Ubuntu: libbluetooth-dev
+```
+
 * **PyBluez**
 ```
 pip3 install pybluez
