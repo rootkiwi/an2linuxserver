@@ -119,7 +119,11 @@ class TCPHandler(socketserver.BaseRequestHandler):
             print_with_timestamp('(TCP) Failed TLS handshake pair_request: {}'.format(ssle))
             return
 
-        print_with_timestamp('(TCP) Pair request from: {}\n'.format(self.client_address[0]))
+        ip = self.client_address[0]
+        # remove first ::ffff: if ipv4 mapped ipv6 address
+        if len(ip) > 7 and ip[:7] == '::ffff:':
+            ip = ip[7:]
+        print_with_timestamp('(TCP) Pair request from: {}\n'.format(ip))
 
         client_cert_size = struct.unpack('>I', recvall(tls_socket, 4))[0]
         client_cert = recvall(tls_socket, client_cert_size)
