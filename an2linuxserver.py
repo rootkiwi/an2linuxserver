@@ -369,11 +369,17 @@ class BluetoothHandler:
     def handle_pair_request(self):
         BluetoothHandler.active_pairing_connection = True
         BluetoothHandler.cancel_pairing = False
-        pair_tls_ctx = ssl.SSLContext(protocol=ssl.PROTOCOL_TLSv1_2)
+
+        if bluetooth_support_kitkat:
+            pair_tls_ctx = ssl.SSLContext(protocol=ssl.PROTOCOL_TLSv1)
+            pair_tls_ctx.set_ciphers('DHE-RSA-AES256-SHA')
+            pair_tls_ctx.load_dh_params(DHPARAM_PATH)
+        else:
+            pair_tls_ctx = ssl.SSLContext(protocol=ssl.PROTOCOL_TLSv1_2)
+            pair_tls_ctx.set_ciphers('ECDHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-SHA')
+            pair_tls_ctx.set_ecdh_curve('prime256v1')
+
         pair_tls_ctx.load_cert_chain(CERTIFICATE_PATH, RSA_PRIVATE_KEY_PATH)
-        pair_tls_ctx.set_ciphers('ECDHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-SHA')
-        pair_tls_ctx.set_ecdh_curve('prime256v1')
-        pair_tls_ctx.options |= ssl.OP_SINGLE_ECDH_USE
 
         self.incoming = ssl.MemoryBIO()
         self.outgoing = ssl.MemoryBIO()
@@ -459,7 +465,6 @@ class BluetoothHandler:
                     print('\nSocket closed or recieved something strange')
                     BluetoothHandler.cancel_pairing = True
                     break
-
                 if client_response == ACCEPT_PAIRING:
                     self.client_allow_pair = True
                     if self.server_allow_pair:
@@ -492,10 +497,14 @@ class BluetoothHandler:
     def handle_notification_connection(self):
         self.incoming = ssl.MemoryBIO()
         self.outgoing = ssl.MemoryBIO()
-
         try:
-            notif_tls_ctx.load_verify_locations(cadata=parse_authorized_certs())
-            self.tls_bio = notif_tls_ctx.wrap_bio(incoming=self.incoming, outgoing=self.outgoing, server_side=True)
+            if bluetooth_support_kitkat:
+                notif_tls_ctx_kitkat_bt.load_verify_locations(cadata=parse_authorized_certs())
+                self.tls_bio = notif_tls_ctx_kitkat_bt.wrap_bio(incoming=self.incoming, outgoing=self.outgoing,
+                                                                server_side=True)
+            else:
+                notif_tls_ctx.load_verify_locations(cadata=parse_authorized_certs())
+                self.tls_bio = notif_tls_ctx.wrap_bio(incoming=self.incoming, outgoing=self.outgoing, server_side=True)
             self.do_handshake()
         except Exception as e:
             print_with_timestamp('(Bluetooth) Failed TLS handshake notif_conn: {}'.format(e))
@@ -562,6 +571,22 @@ def print_with_timestamp(string):
     print('[{}] {}'.format(current_time, string))
 
 
+def generate_dhparam():
+    print_with_timestamp('Since you have enabled bluetooth support for android 4.4 kitkat I will now need to')
+    print_with_timestamp('Generate DH parameters, which is going to take a while')
+    print_with_timestamp('On my laptop (Intel i5) it took ~16 minutes')
+    dhparam_process = subprocess.Popen(['openssl', 'dhparam', '-out', DHPARAM_PATH, '4096'],
+                                       stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+    stderr = dhparam_process.communicate()[1]
+    if dhparam_process.returncode == 0:
+        print_with_timestamp('Generated DH parameters 4096 bit')
+        print_with_timestamp('Saved to: ' + DHPARAM_PATH)
+    else:
+        print_with_timestamp('Error generating DH parameters, exiting..')
+        print(stderr)
+        sys.exit(1)
+
+
 def generate_server_private_key_and_certificate(CERTIFICATE_PATH, RSA_PRIVATE_KEY_PATH):
     openssl_process = subprocess.Popen(['openssl', 'req', '-x509', '-newkey', 'rsa:4096', '-nodes', '-sha256',
                                         '-keyout', RSA_PRIVATE_KEY_PATH, '-out', CERTIFICATE_PATH,
@@ -625,7 +650,15 @@ def create_default_config_file_and_exit():
     config_parser = configparser.ConfigParser(allow_no_value=True)
     config_parser['tcp'] = {'tcp_server': 'on',
                             'tcp_port': '46352'}
-    config_parser['bluetooth'] = {'bluetooth_server': 'off'}
+    config_parser.add_section('bluetooth')
+    config_parser.set('bluetooth', 'bluetooth_server', 'off')
+    config_parser.set('bluetooth', '\n# bluetooth_support_kitkat: enable bluetooth support for android 4.4 kitkat')
+    config_parser.set('bluetooth', '# this setting is important for everyone using bluetooth')
+    config_parser.set('bluetooth', '# you need to set this setting correctly otherwise it will not work')
+    config_parser.set('bluetooth', '# if you are using android 4.4 kitkat this needs to be turned on')
+    config_parser.set('bluetooth', '# because some cipher versions are not supported until after kitkat')
+    config_parser.set('bluetooth', '# if you are using android 5.0+ you need to keep this setting off')
+    config_parser.set('bluetooth', 'bluetooth_support_kitkat', 'off')
     config_parser.add_section('notification')
     config_parser.set('notification', '# notification_timeout: display notification for this many seconds')
     config_parser.set('notification', '# set 0 to never expire')
@@ -659,6 +692,17 @@ def parse_config_or_create_new():
                 print('Invalid port, port must be 0-65535')
                 sys.exit(1)
             bluetooth_server_enabled = config_parser.getboolean('bluetooth', 'bluetooth_server')
+            try:
+                bluetooth_support_kitkat = config_parser.getboolean('bluetooth', 'bluetooth_support_kitkat')
+            except (configparser.Error, ValueError):
+                bluetooth_support_kitkat = False
+                print_with_timestamp('Cound not find setting "bluetooth_support_kitkat" in your config file')
+                print_with_timestamp('This is a new setting that has been added')
+                print_with_timestamp('For now I will keep an2linux running and set this setting to off')
+                print_with_timestamp('If you do not wan\'t to see these messages or you want to enable this setting')
+                print_with_timestamp('Then turn off an2linux and rename or delete your current config file')
+                print_with_timestamp('Located at: "{}"'.format(CONF_FILE_PATH))
+                print_with_timestamp('Then start an2linux again to generate a new config file including this setting')
             notification_timeout_milliseconds = config_parser.getint('notification', 'notification_timeout') * 1000
             if notification_timeout_milliseconds < 0:
                 notification_timeout_milliseconds = 0
@@ -670,7 +714,8 @@ def parse_config_or_create_new():
             Notification.latest_notifications = deque(maxlen=list_size_duplicates)
             ignore_duplicates_list_for_titles = config_parser.get('notification', 'ignore_duplicates_list_for_titles')
             Notification.titles_that_ignore_latest = [title.strip() for title in ignore_duplicates_list_for_titles.split(',')]
-            return tcp_server_enabled, tcp_port_number, bluetooth_server_enabled, notification_timeout_milliseconds
+            return tcp_server_enabled, tcp_port_number,\
+                   bluetooth_server_enabled, bluetooth_support_kitkat, notification_timeout_milliseconds
         except (configparser.Error, ValueError) as e:
             print_with_timestamp('Corrupted configuration file: {}'.format(e))
             try:
@@ -711,6 +756,7 @@ def init():
     CERTIFICATE_PATH = os.path.join(CONF_DIR_PATH, 'certificate.pem')
     RSA_PRIVATE_KEY_PATH = os.path.join(CONF_DIR_PATH, 'rsakey.pem')
     AUTHORIZED_CERTS_PATH = os.path.join(CONF_DIR_PATH, 'authorized_certs')
+    DHPARAM_PATH = os.path.join(CONF_DIR_PATH, 'dhparam.pem')
 
     TMP_DIR_PATH = os.path.join(tempfile.gettempdir(), 'an2linux')
 
@@ -733,15 +779,14 @@ def init():
             print_with_timestamp('Will generate new key overwriting old key and certificate')
             generate_server_private_key_and_certificate(CERTIFICATE_PATH, RSA_PRIVATE_KEY_PATH)
 
-    return CONF_FILE_PATH, CERTIFICATE_PATH, RSA_PRIVATE_KEY_PATH, AUTHORIZED_CERTS_PATH, TMP_DIR_PATH
+    return CONF_FILE_PATH, CERTIFICATE_PATH, RSA_PRIVATE_KEY_PATH, AUTHORIZED_CERTS_PATH, DHPARAM_PATH, TMP_DIR_PATH
 
 
 if __name__ == '__main__':
-    CONF_FILE_PATH, CERTIFICATE_PATH, RSA_PRIVATE_KEY_PATH, AUTHORIZED_CERTS_PATH, TMP_DIR_PATH = \
-        init()
+    CONF_FILE_PATH, CERTIFICATE_PATH, RSA_PRIVATE_KEY_PATH, AUTHORIZED_CERTS_PATH, DHPARAM_PATH, TMP_DIR_PATH = init()
 
-    tcp_server_enabled, tcp_port_number, bluetooth_server_enabled, notification_timeout_milliseconds = \
-        parse_config_or_create_new()
+    tcp_server_enabled, tcp_port_number, bluetooth_server_enabled, bluetooth_support_kitkat,\
+        notification_timeout_milliseconds = parse_config_or_create_new()
 
     if not tcp_server_enabled and not bluetooth_server_enabled:
         print_with_timestamp('Neither TCP nor Bluetooth is enabled in your config file at {}'.format(CONF_FILE_PATH))
@@ -780,6 +825,24 @@ if __name__ == '__main__':
     if bluetooth_server_enabled:
         try:
             from bluetooth import *
+            if bluetooth_support_kitkat:
+                if not os.path.isfile(DHPARAM_PATH):
+                    generate_dhparam()
+                else:
+                    try:
+                        # try if valid dh parameters
+                        ssl.SSLContext(protocol=ssl.PROTOCOL_TLSv1_2).load_dh_params(DHPARAM_PATH)
+                    except Exception as e:
+                        print_with_timestamp('Something went wrong trying to load your DH parameters: {}'.format(e))
+                        print_with_timestamp('Will generate new parameters overwriting old parameters')
+                        generate_dhparam()
+                notif_tls_ctx_kitkat_bt = ssl.SSLContext(protocol=ssl.PROTOCOL_TLSv1)
+                notif_tls_ctx_kitkat_bt.load_cert_chain(CERTIFICATE_PATH, RSA_PRIVATE_KEY_PATH)
+                notif_tls_ctx_kitkat_bt.set_ciphers('DHE-RSA-AES256-SHA')
+                notif_tls_ctx_kitkat_bt.load_dh_params(DHPARAM_PATH)
+                notif_tls_ctx_kitkat_bt.options |= ssl.OP_SINGLE_DH_USE
+                notif_tls_ctx_kitkat_bt.verify_mode = ssl.CERT_REQUIRED
+
             bluetooth_server = ThreadingBluetoothServer()
             print_with_timestamp('(Bluetooth) Waiting for connections on RFCOMM channel {}'
                                  .format(bluetooth_server.port))
