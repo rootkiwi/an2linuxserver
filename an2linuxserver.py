@@ -94,18 +94,23 @@ class TCPHandler(socketserver.BaseRequestHandler):
     def handle(self):
         try:
             conn_type = self.request.recv(1)
-            if conn_type == PAIR_REQUEST:
-                if not TCPHandler.active_pairing_connection:
+            if conn_type == PAIR_REQUEST and not TCPHandler.active_pairing_connection:
+                TCPHandler.active_pairing_connection = True
+                TCPHandler.cancel_pairing = False
+                try:
                     self.handle_pair_request()
+                except Exception as e:
+                    print_with_timestamp('(TCP) Error pair_request: {}'.format(e))
+                TCPHandler.active_pairing_connection = False
             elif conn_type == NOTIF_CONN:
-                self.handle_notification_connection()
+                try:
+                    self.handle_notification_connection()
+                except Exception as e:
+                    print_with_timestamp('(TCP) Error notif_conn: {}'.format(e))
         except Exception as e:
-            print('Error TCPHandler/handle')
-            print(e)
+            print_with_timestamp('(TCP) Error handle: {}'.format(e))
 
     def handle_pair_request(self):
-        TCPHandler.active_pairing_connection = True
-        TCPHandler.cancel_pairing = False
         pair_tls_ctx = ssl.SSLContext(protocol=ssl.PROTOCOL_TLSv1_2)
         pair_tls_ctx.load_cert_chain(CERTIFICATE_PATH, RSA_PRIVATE_KEY_PATH)
         pair_tls_ctx.set_ciphers('ECDHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-SHA')
@@ -115,7 +120,6 @@ class TCPHandler(socketserver.BaseRequestHandler):
         try:
             tls_socket = pair_tls_ctx.wrap_socket(self.request, server_side=True)
         except ssl.SSLError as ssle:
-            TCPHandler.active_pairing_connection = False
             print_with_timestamp('(TCP) Failed TLS handshake pair_request: {}'.format(ssle))
             return
 
@@ -171,8 +175,6 @@ class TCPHandler(socketserver.BaseRequestHandler):
                     TCPHandler.cancel_pairing = True
                 else:
                     print(self.user_input_prompt, end='', flush=True)
-
-        TCPHandler.active_pairing_connection = False
 
     def pair_response_thread(self, tls_socket):
         while not TCPHandler.cancel_pairing:
@@ -314,12 +316,20 @@ class BluetoothHandler:
         try:
             conn_type = self.socket.recv(1)
             if conn_type == PAIR_REQUEST and not BluetoothHandler.active_pairing_connection:
-                self.handle_pair_request()
+                BluetoothHandler.active_pairing_connection = True
+                BluetoothHandler.cancel_pairing = False
+                try:
+                    self.handle_pair_request()
+                except Exception as e:
+                    print_with_timestamp('(Bluetooth) Error pair_request: {}'.format(e))
+                BluetoothHandler.active_pairing_connection = False
             elif conn_type == NOTIF_CONN:
-                self.handle_notification_connection()
+                try:
+                    self.handle_notification_connection()
+                except Exception as e:
+                    print_with_timestamp('(Bluetooth) Error notif_conn: {}'.format(e))
         except Exception as e:
-            print('Error BluetoothHandler/handle')
-            print(e)
+            print_with_timestamp('(Bluetooth) Error handle: {}'.format(e))
         finally:
             self.socket.close()
 
@@ -367,9 +377,6 @@ class BluetoothHandler:
         return self.tls_read_full_record()
 
     def handle_pair_request(self):
-        BluetoothHandler.active_pairing_connection = True
-        BluetoothHandler.cancel_pairing = False
-
         if bluetooth_support_kitkat:
             pair_tls_ctx = ssl.SSLContext(protocol=ssl.PROTOCOL_TLSv1)
             pair_tls_ctx.set_ciphers('DHE-RSA-AES256-SHA')
@@ -388,7 +395,6 @@ class BluetoothHandler:
         try:
             self.do_handshake()
         except ssl.SSLError as ssle:
-            BluetoothHandler.active_pairing_connection = False
             print_with_timestamp('(Bluetooth) Failed TLS handshake pair_request: {}'.format(ssle))
             return
 
@@ -450,8 +456,6 @@ class BluetoothHandler:
                     BluetoothHandler.cancel_pairing = True
                 else:
                     print(self.user_input_prompt, end='', flush=True)
-
-        BluetoothHandler.active_pairing_connection = False
 
     def pair_response_thread(self):
         while not BluetoothHandler.cancel_pairing:
