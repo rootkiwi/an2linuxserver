@@ -692,17 +692,6 @@ def parse_config_or_create_new():
                 print('Invalid port, port must be 0-65535')
                 sys.exit(1)
             bluetooth_server_enabled = config_parser.getboolean('bluetooth', 'bluetooth_server')
-            try:
-                bluetooth_support_kitkat = config_parser.getboolean('bluetooth', 'bluetooth_support_kitkat')
-            except (configparser.Error, ValueError):
-                bluetooth_support_kitkat = False
-                print_with_timestamp('Cound not find setting "bluetooth_support_kitkat" in your config file')
-                print_with_timestamp('This is a new setting that has been added')
-                print_with_timestamp('For now I will keep an2linux running and set this setting to off')
-                print_with_timestamp('If you do not wan\'t to see these messages or you want to enable this setting')
-                print_with_timestamp('Then turn off an2linux and rename or delete your current config file')
-                print_with_timestamp('Located at: "{}"'.format(CONF_FILE_PATH))
-                print_with_timestamp('Then start an2linux again to generate a new config file including this setting')
             notification_timeout_milliseconds = config_parser.getint('notification', 'notification_timeout') * 1000
             if notification_timeout_milliseconds < 0:
                 notification_timeout_milliseconds = 0
@@ -714,6 +703,17 @@ def parse_config_or_create_new():
             Notification.latest_notifications = deque(maxlen=list_size_duplicates)
             ignore_duplicates_list_for_titles = config_parser.get('notification', 'ignore_duplicates_list_for_titles')
             Notification.titles_that_ignore_latest = [title.strip() for title in ignore_duplicates_list_for_titles.split(',')]
+            try:
+                bluetooth_support_kitkat = config_parser.getboolean('bluetooth', 'bluetooth_support_kitkat')
+            except (configparser.Error, ValueError):
+                bluetooth_support_kitkat = False
+                print_with_timestamp('Cound not find setting "bluetooth_support_kitkat" in your config file')
+                print_with_timestamp('This is a new setting that has been added')
+                print_with_timestamp('For now I will keep an2linux running and set this setting to off')
+                print_with_timestamp('If you do not wan\'t to see these messages or you want to enable this setting')
+                print_with_timestamp('Then turn off an2linux and rename or delete your current config file')
+                print_with_timestamp('Located at: "{}"'.format(CONF_FILE_PATH))
+                print_with_timestamp('Then start an2linux again to generate a new config file including this setting')
             return tcp_server_enabled, tcp_port_number,\
                    bluetooth_server_enabled, bluetooth_support_kitkat, notification_timeout_milliseconds
         except (configparser.Error, ValueError) as e:
