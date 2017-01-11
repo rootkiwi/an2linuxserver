@@ -37,6 +37,12 @@ Arch: python-gobject
 Debian / Ubuntu: python3-gi
 ```
 
+* **gdk-pixbuf2**
+```
+Arch: gdk-pixbuf2
+Debian / Ubuntu: gir1.2-gdkpixbuf
+```
+
 * **openssl (1.0.1+)**
 
 ### For bluetooth:
