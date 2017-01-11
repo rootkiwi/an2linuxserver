@@ -28,19 +28,13 @@ Debian / Ubuntu: python3
 * **libnotify**
 ```
 Arch: libnotify
-Debian / Ubuntu: libnotify4 gir1.2-notify-0.7
+Debian / Ubuntu: libnotify4 gir1.2-notify-0.7 gir1.2-gdkpixbuf
 ```
 
 * **python-gobject**
 ```
 Arch: python-gobject
 Debian / Ubuntu: python3-gi
-```
-
-* **gdk-pixbuf2**
-```
-Arch: gdk-pixbuf2
-Debian / Ubuntu: gir1.2-gdkpixbuf
 ```
 
 * **openssl (1.0.1+)**
