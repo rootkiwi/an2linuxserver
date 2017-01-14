@@ -79,7 +79,13 @@ class Notification:
             if self.icon_tmp_file is not None:
                 Notification.active_notifications_with_icons.append(self)
                 self.notif.connect('closed', self.closed_callback)
-            self.notif.show()
+            try:
+                self.notif.show()
+            except Exception as e:
+                print_with_timestamp('(Notification) Error showing notification: \
+                        {}'.format(e));
+                print_with_timestamp('Please make sure you have a notification \
+                        server installed on your system')
 
     def closed_callback(self, notif_instance):
         self.icon_tmp_file.close()
