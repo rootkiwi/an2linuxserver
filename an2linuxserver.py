@@ -46,6 +46,8 @@ import base64
 import select
 from collections import deque
 
+def chkflags(flags, flag):
+    return flags & flag == flag
 
 class Notification:
 
@@ -226,20 +228,9 @@ class TCPHandler(socketserver.BaseRequestHandler):
 
         notification_flags = struct.unpack('>B', tls_socket.recv(1))[0]
 
-        if notification_flags & FLAG_INCLUDE_TITLE == FLAG_INCLUDE_TITLE:
-            include_title = True
-        else:
-            include_title = False
-
-        if notification_flags & FLAG_INCLUDE_MESSAGE == FLAG_INCLUDE_MESSAGE:
-            include_message = True
-        else:
-            include_message = False
-
-        if notification_flags & FLAG_INCLUDE_ICON == FLAG_INCLUDE_ICON:
-            include_icon = True
-        else:
-            include_icon = False
+        include_title   = chkflags(notification_flags, FLAG_INCLUDE_TITLE)
+        include_message = chkflags(notification_flags, FLAG_INCLUDE_MESSAGE)
+        include_icon    = chkflags(notification_flags, FLAG_INCLUDE_ICON)
 
         title = ''
         message = ''
@@ -527,20 +518,9 @@ class BluetoothHandler:
         notification_flags_encrypted = recvall(self.socket, notification_flags_size)
         notification_flags = struct.unpack('>B', self.tls_decrypt(notification_flags_encrypted))[0]
 
-        if notification_flags & FLAG_INCLUDE_TITLE == FLAG_INCLUDE_TITLE:
-            include_title = True
-        else:
-            include_title = False
-
-        if notification_flags & FLAG_INCLUDE_MESSAGE == FLAG_INCLUDE_MESSAGE:
-            include_message = True
-        else:
-            include_message = False
-
-        if notification_flags & FLAG_INCLUDE_ICON == FLAG_INCLUDE_ICON:
-            include_icon = True
-        else:
-            include_icon = False
+        include_title   = chkflags(notification_flags, FLAG_INCLUDE_TITLE)
+        include_message = chkflags(notification_flags, FLAG_INCLUDE_MESSAGE)
+        include_icon    = chkflags(notification_flags, FLAG_INCLUDE_ICON)
 
         title = ''
         message = ''
