@@ -1,5 +1,5 @@
 # AN2Linux - server
-Sync android notifications encrypted to a linux desktop with tcp or bluetooth.
+Sync Android notifications encrypted using TLS to a Linux desktop over WiFi, Mobile data or Bluetooth.
 
 This is the server part of AN2Linux.
 
@@ -97,7 +97,7 @@ systemctl edit bluetooth.service
 ```
 
 #### Add the following lines:
-````
+```
 [Service]
 ExecStart=
 ExecStart=/usr/lib/bluetooth/bluetoothd -C
@@ -114,18 +114,8 @@ More info about this problem:
 https://bbs.archlinux.org/viewtopic.php?id=201672.
 
 ## Run in background:
-You could just run an2linux in its own terminal window but maybe you want
-to have it run in background somehow and maybe to autostart.
-
-There are many different ways to do that.
-
-You could use screen/tmux or a systemd service.<br>
-The great thing about screen/tmux is that you can attach to it if needed.
-
-#### With tmux you could use something like this:
-```
-tmux new -d -s an2linux '<path_to_an2linuxserver.py>'
-```
+You may want to run AN2Linux as a background service, there are many different ways to accomplish that.
+Below is an example using a systemd service.
 
 #### Example user systemd service:
 *~/.config/systemd/user/an2linux.service*
@@ -138,22 +128,6 @@ Type=simple
 StandardOutput=null
 Restart=on-failure
 ExecStart=<path_to_an2linuxserver.py>
-
-[Install]
-WantedBy=default.target
-```
-
-#### Or you could combine tmux with a systemd service:
-*~/.config/systemd/user/an2linux_tmux.service*
-```
-[Unit]
-Description=AN2Linux server tmux
-
-[Service]
-Type=forking
-Restart=on-failure
-ExecStart=/usr/bin/tmux new -d -s an2linux '<path_to_an2linuxserver.py>'
-ExecStop=/usr/bin/tmux kill-session -t an2linux
 
 [Install]
 WantedBy=default.target
