@@ -140,15 +140,17 @@ class TCPHandler(socketserver.BaseRequestHandler):
         client_cert_size = struct.unpack('>I', recvall(tls_socket, 4))[0]
         client_cert = recvall(tls_socket, client_cert_size)
 
-        sha1 = hashlib.sha1(client_cert + SERVER_CERT_DER).hexdigest().upper()
-        sha1_format = [sha1[x:x + 2] for x in range(0, len(sha1), 2)]
+        sha256 = hashlib.sha256(client_cert + SERVER_CERT_DER).hexdigest().upper()
+        sha256_format = [sha256[x:x + 2] for x in range(0, len(sha256), 2)]
 
         print('It is very important that you verify that the following hash matches what is viewed on your phone\n'
-              'It is a sha1 hash like so: sha1(client_cert + server_cert)\n\n'
+              'It is a sha256 hash like so: sha256(client_cert + server_cert)\n\n'
               'If the hash don\'t match there could be a man-in-the-middle attack\n'
               'Or something else is not right, you should abort if they don\'t match!\n')
-        print(' '.join(sha1_format[:len(sha1_format) // 2]))
-        print(' '.join(sha1_format[len(sha1_format) // 2:]))
+        print(' '.join(sha256_format[:8]))
+        print(' '.join(sha256_format[8:16]))
+        print(' '.join(sha256_format[16:24]))
+        print(' '.join(sha256_format[24:]))
 
         self.server_allow_pair = False
         self.client_allow_pair = False
@@ -249,12 +251,12 @@ class TCPHandler(socketserver.BaseRequestHandler):
             icon = recvall(tls_socket, icon_size)
             try:
                 icon_tmp_file.write(icon)
-                Notification(title, message, hashlib.sha1(title.encode() + message.encode() + icon).digest(),
+                Notification(title, message, hashlib.sha256(title.encode() + message.encode() + icon).digest(),
                              icon_tmp_file).show()
             except Exception:
-                Notification(title, message, hashlib.sha1(title.encode() + message.encode()).digest()).show()
+                Notification(title, message, hashlib.sha256(title.encode() + message.encode()).digest()).show()
         else:
-            Notification(title, message, hashlib.sha1(title.encode() + message.encode()).digest()).show()
+            Notification(title, message, hashlib.sha256(title.encode() + message.encode()).digest()).show()
 
 
 class ThreadingDualStackServer(socketserver.ThreadingTCPServer):
@@ -404,15 +406,17 @@ class BluetoothHandler:
         client_cert_encrypted = recvall(self.socket, client_cert_size)
         client_cert = self.tls_decrypt(client_cert_encrypted)
 
-        sha1 = hashlib.sha1(client_cert + SERVER_CERT_DER).hexdigest().upper()
-        sha1_format = [sha1[x:x + 2] for x in range(0, len(sha1), 2)]
+        sha256 = hashlib.sha256(client_cert + SERVER_CERT_DER).hexdigest().upper()
+        sha256_format = [sha256[x:x + 2] for x in range(0, len(sha256), 2)]
 
         print('It is very important that you verify that the following hash matches what is viewed on your phone\n'
-              'It is a sha1 hash like so: sha1(client_cert + server_cert)\n\n'
+              'It is a sha256 hash like so: sha256(client_cert + server_cert)\n\n'
               'If the hash don\'t match there could be a man-in-the-middle attack\n'
               'Or something else is not right, you should abort if they don\'t match!\n')
-        print(' '.join(sha1_format[:len(sha1_format) // 2]))
-        print(' '.join(sha1_format[len(sha1_format) // 2:]))
+        print(' '.join(sha256_format[:8]))
+        print(' '.join(sha256_format[8:16]))
+        print(' '.join(sha256_format[16:24]))
+        print(' '.join(sha256_format[24:]))
 
         self.server_allow_pair = False
         self.client_allow_pair = False
@@ -541,12 +545,12 @@ class BluetoothHandler:
             icon = self.tls_decrypt(icon_encrypted)
             try:
                 icon_tmp_file.write(icon)
-                Notification(title, message, hashlib.sha1(title.encode() + message.encode() + icon).digest(),
+                Notification(title, message, hashlib.sha256(title.encode() + message.encode() + icon).digest(),
                              icon_tmp_file).show()
             except Exception:
-                Notification(title, message, hashlib.sha1(title.encode() + message.encode()).digest()).show()
+                Notification(title, message, hashlib.sha256(title.encode() + message.encode()).digest()).show()
         else:
-            Notification(title, message, hashlib.sha1(title.encode() + message.encode()).digest()).show()
+            Notification(title, message, hashlib.sha256(title.encode() + message.encode()).digest()).show()
 
 
 def recvall(socket, size):
@@ -595,8 +599,6 @@ def generate_server_private_key_and_certificate(CERTIFICATE_PATH, RSA_PRIVATE_KE
 
 def parse_authorized_certs():
     if os.path.isfile(AUTHORIZED_CERTS_PATH):
-        # authorized_certs file:
-        # sha1(cert_DER).hexdigest() base64.b64encode(cert_DER).decode()
         with open(AUTHORIZED_CERTS_PATH, 'r') as f:
             try:
                 authorized_certs = b''.join([base64.b64decode(line.split(' ')[1])
@@ -616,8 +618,8 @@ def parse_authorized_certs():
 
 
 def add_to_authorized_certs(cert_der):
-    sha1 = hashlib.sha1(cert_der).hexdigest().upper()
-    sha1_format = [sha1[x:x + 2] for x in range(0, len(sha1), 2)]
+    sha256 = hashlib.sha256(cert_der).hexdigest().upper()
+    sha256_format = [sha256[x:x + 2] for x in range(0, len(sha256), 2)]
     if not cert_der in parse_authorized_certs():
         with open(AUTHORIZED_CERTS_PATH, 'a+') as f:
             f.seek(0)
@@ -628,12 +630,12 @@ def add_to_authorized_certs(cert_der):
                 if lastchar != '\n':
                     first_char_to_write = '\n'
 
-            f.write(''.join([first_char_to_write, ':'.join(sha1_format),
+            f.write(''.join([first_char_to_write, 'SHA256:', ':'.join(sha256_format),
                              ' ', base64.b64encode(cert_der).decode(), '\n']))
 
-        print_with_timestamp('Certificate with fingerprint: {} saved successfully'.format(' '.join(sha1_format)))
+        print_with_timestamp('Certificate with fingerprint: {} saved successfully'.format(' '.join(sha256_format)))
     else:
-        print_with_timestamp('Certificate with fingerprint: {} is already in authorized_certs'.format(' '.join(sha1_format)))
+        print_with_timestamp('Certificate with fingerprint: {} is already in authorized_certs'.format(' '.join(sha256_format)))
 
 
 def create_default_config_file_and_exit():
@@ -783,9 +785,9 @@ if __name__ == '__main__':
         sys.exit()
 
     SERVER_CERT_DER = ssl.PEM_cert_to_DER_cert(open(CERTIFICATE_PATH, 'r').read())
-    sha1 = hashlib.sha1(SERVER_CERT_DER).hexdigest().upper()
-    sha1_format = [sha1[x:x + 2] for x in range(0, len(sha1), 2)]
-    print_with_timestamp('Server certificate fingerprint: {}'.format(' '.join(sha1_format)))
+    sha256 = hashlib.sha256(SERVER_CERT_DER).hexdigest().upper()
+    sha256_format = [sha256[x:x + 2] for x in range(0, len(sha256), 2)]
+    print_with_timestamp('Server certificate fingerprint: {}'.format(' '.join(sha256_format)))
 
     PAIR_REQUEST = b'\x00'
     NOTIF_CONN = b'\x01'
