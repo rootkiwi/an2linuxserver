@@ -662,10 +662,10 @@ def create_default_config_file_and_exit():
     config_parser.set('notification', '\n# list_size_duplicates: number of latest notifications to keep')
     config_parser.set('notification', '# integer 0-50, if a notification is in this list it will not be shown')
     config_parser.set('notification', '# set to 0 to disable')
-    config_parser.set('notification', 'list_size_duplicates', '2')
+    config_parser.set('notification', 'list_size_duplicates', '0')
     config_parser.set('notification', '\n# ignore_duplicates_list_for_titles: notification titles that ignore duplicates list')
     config_parser.set('notification', '# comma-separated, case-sensitive')
-    config_parser.set('notification', 'ignore_duplicates_list_for_titles', 'AN2Linux, title, Snapchat')
+    config_parser.set('notification', 'ignore_duplicates_list_for_titles', 'AN2Linux, title')
     with open(CONF_FILE_PATH, 'w') as configfile:
         config_parser.write(configfile)
     print_with_timestamp('Created new default configuration file at "{}"'.format(CONF_FILE_PATH))
