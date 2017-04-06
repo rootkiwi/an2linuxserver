@@ -1,0 +1,21 @@
+[Unit]
+Description=AN2Linux
+#Wants=bluetooth.service
+#After=bluetooth.service
+
+[Service]
+Type=simple
+User=<user>
+Group=<group>
+StandardOutput=null
+Restart=on-failure
+#ExecStartPre=/usr/bin/sleep 3
+ExecStart=<path_to_an2linuxserver.py>
+Environment=DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus
+PrivateDevices=true
+ProtectHome=read-only
+ProtectSystem=strict
+ReadWritePaths=/tmp
+
+[Install]
+WantedBy=default.target

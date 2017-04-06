@@ -1,0 +1,11 @@
+[Unit]
+Description=AN2Linux
+
+[Service]
+Type=simple
+StandardOutput=null
+Restart=on-failure
+ExecStart=<path_to_an2linuxserver.py>
+
+[Install]
+WantedBy=default.target
