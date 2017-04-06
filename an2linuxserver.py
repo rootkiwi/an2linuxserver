@@ -553,10 +553,13 @@ class BluetoothHandler:
             Notification(title, message, hashlib.sha256(title.encode() + message.encode()).digest()).show()
 
 
-def recvall(socket, size):
+def recvall(sock, size):
     buf = bytearray()
     while len(buf) < size:
-        buf.extend(socket.recv(size - len(buf)))
+        tmp = sock.recv(size - len(buf))
+        if tmp == b'':
+            raise ConnectionResetError('connection reset by peer')
+        buf.extend(tmp)
     return buf
 
 
