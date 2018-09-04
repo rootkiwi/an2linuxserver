@@ -57,6 +57,9 @@ class Notification:
     # this is a list of notification titles to ignore latest_notifications list
     titles_that_ignore_latest = None
 
+    # list of keywords that trigger notifcation to be ignored
+    keywords_to_ignore = None
+
     '''this is to keep a list of active Notification objects with icons to avoid being garbage collected
     because when a Notification object is garbage collected the TemporaryFile is destroyed
     and atleast with dunst notification daemon with stacked notifications when an icon file
@@ -73,7 +76,9 @@ class Notification:
             self.icon_path = icon_tmp_file.name
 
     def show(self):
-        if self.notif_hash not in Notification.latest_notifications or self.title in Notification.titles_that_ignore_latest:
+        if (self.notif_hash not in Notification.latest_notifications \
+          or self.title in Notification.titles_that_ignore_latest) \
+          and not any(kw in self.title for kw in Notification.keywords_to_ignore if kw != ''):
             Notification.latest_notifications.append(self.notif_hash)
             Notify.init('AN2Linux')
             self.notif = Notify.Notification.new(self.title, self.message, self.icon_path)
@@ -666,6 +671,9 @@ def create_default_config_file_and_exit():
     config_parser.set('notification', '\n# ignore_duplicates_list_for_titles: notification titles that ignore duplicates list')
     config_parser.set('notification', '# comma-separated, case-sensitive')
     config_parser.set('notification', 'ignore_duplicates_list_for_titles', 'AN2Linux, title')
+    config_parser.set('notification', '\n# keywords_to_ignore: do not show notifications that include these keywords in the notification titles')
+    config_parser.set('notification', '# comma-separated, case-sensitive. leading and trailing whitespace will be stripped.')
+    config_parser.set('notification', 'keywords_to_ignore', '')
     with open(CONF_FILE_PATH, 'w') as configfile:
         config_parser.write(configfile)
     print_with_timestamp('Created new default configuration file at "{}"'.format(CONF_FILE_PATH))
@@ -698,6 +706,10 @@ def parse_config_or_create_new():
             Notification.latest_notifications = deque(maxlen=list_size_duplicates)
             ignore_duplicates_list_for_titles = config_parser.get('notification', 'ignore_duplicates_list_for_titles')
             Notification.titles_that_ignore_latest = [title.strip() for title in ignore_duplicates_list_for_titles.split(',')]
+
+            keywords_to_ignore = config_parser.get('notification', 'keywords_to_ignore')
+            Notification.keywords_to_ignore = [kw.strip() for kw in keywords_to_ignore.split(',')]
+
             try:
                 bluetooth_support_kitkat = config_parser.getboolean('bluetooth', 'bluetooth_support_kitkat')
             except (configparser.Error, ValueError):
