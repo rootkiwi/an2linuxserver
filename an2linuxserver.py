@@ -7,6 +7,7 @@
 #
 # See LICENSE for more details.
 
+import logging
 import sys
 try:
     import ssl
@@ -89,10 +90,10 @@ class Notification:
             try:
                 self.notif.show()
             except Exception as e:
-                print_with_timestamp('(Notification) Error showing notification:' \
-                        ' {}'.format(e));
-                print_with_timestamp('Please make sure you have a notification' \
-                        ' server installed on your system')
+                logging.error('(Notification) Error showing notification:' \
+                              ' {}'.format(e));
+                logging.error('Please make sure you have a notification' \
+                              ' server installed on your system')
 
     def closed_callback(self, notif_instance):
         self.icon_tmp_file.close()
@@ -113,15 +114,15 @@ class TCPHandler(socketserver.BaseRequestHandler):
                 try:
                     self.handle_pair_request()
                 except Exception as e:
-                    print_with_timestamp('(TCP) Error pair_request: {}'.format(e))
+                    logging.error('(TCP) Error pair_request: {}'.format(e))
                 TCPHandler.active_pairing_connection = False
             elif conn_type == NOTIF_CONN:
                 try:
                     self.handle_notification_connection()
                 except Exception as e:
-                    print_with_timestamp('(TCP) Error notif_conn: {}'.format(e))
+                    logging.error('(TCP) Error notif_conn: {}'.format(e))
         except Exception as e:
-            print_with_timestamp('(TCP) Error handle: {}'.format(e))
+            logging.error('(TCP) Error handle: {}'.format(e))
 
     def handle_pair_request(self):
         pair_tls_ctx = ssl.SSLContext(protocol=ssl.PROTOCOL_TLSv1_2)
@@ -133,14 +134,14 @@ class TCPHandler(socketserver.BaseRequestHandler):
         try:
             tls_socket = pair_tls_ctx.wrap_socket(self.request, server_side=True)
         except ssl.SSLError as ssle:
-            print_with_timestamp('(TCP) Failed TLS handshake pair_request: {}'.format(ssle))
+            logging.error('(TCP) Failed TLS handshake pair_request: {}'.format(ssle))
             return
 
         ip = self.client_address[0]
         # remove first ::ffff: if ipv4 mapped ipv6 address
         if len(ip) > 7 and ip[:7] == '::ffff:':
             ip = ip[7:]
-        print_with_timestamp('(TCP) Pair request from: {}\n'.format(ip))
+        logging.info('(TCP) Pair request from: {}\n'.format(ip))
 
         client_cert_size = struct.unpack('>I', recvall(tls_socket, 4))[0]
         client_cert = recvall(tls_socket, client_cert_size)
@@ -227,7 +228,7 @@ class TCPHandler(socketserver.BaseRequestHandler):
             notif_tls_ctx.load_verify_locations(cadata=parse_authorized_certs())
             tls_socket = notif_tls_ctx.wrap_socket(self.request, server_side=True)
         except Exception as e:
-            print_with_timestamp('(TCP) Failed TLS handshake notif_conn: {}'.format(e))
+            logging.error('(TCP) Failed TLS handshake notif_conn: {}'.format(e))
             return
 
         # one recv should not take longer than 10 sec
@@ -325,15 +326,15 @@ class BluetoothHandler:
                 try:
                     self.handle_pair_request()
                 except Exception as e:
-                    print_with_timestamp('(Bluetooth) Error pair_request: {}'.format(e))
+                    logging.error('(Bluetooth) Error pair_request: {}'.format(e))
                 BluetoothHandler.active_pairing_connection = False
             elif conn_type == NOTIF_CONN:
                 try:
                     self.handle_notification_connection()
                 except Exception as e:
-                    print_with_timestamp('(Bluetooth) Error notif_conn: {}'.format(e))
+                    logging.error('(Bluetooth) Error notif_conn: {}'.format(e))
         except Exception as e:
-            print_with_timestamp('(Bluetooth) Error handle: {}'.format(e))
+            logging.error('(Bluetooth) Error handle: {}'.format(e))
         finally:
             self.socket.close()
 
@@ -399,10 +400,10 @@ class BluetoothHandler:
         try:
             self.do_handshake()
         except ssl.SSLError as ssle:
-            print_with_timestamp('(Bluetooth) Failed TLS handshake pair_request: {}'.format(ssle))
+            logging.error('(Bluetooth) Failed TLS handshake pair_request: {}'.format(ssle))
             return
 
-        print_with_timestamp('(Bluetooth) Pair request from: {}\n'.format(self.address))
+        logging.info('(Bluetooth) Pair request from: {}\n'.format(self.address))
 
         '''I don't know how else to do this when using SSLEngine/SSL_BIO, I don't see any security
         issue with sending the length of the encrypted data in cleartext, using something like wireshark
@@ -517,7 +518,7 @@ class BluetoothHandler:
                 self.tls_bio = notif_tls_ctx.wrap_bio(incoming=self.incoming, outgoing=self.outgoing, server_side=True)
             self.do_handshake()
         except Exception as e:
-            print_with_timestamp('(Bluetooth) Failed TLS handshake notif_conn: {}'.format(e))
+            logging.error('(Bluetooth) Failed TLS handshake notif_conn: {}'.format(e))
             return
 
         # one recv should not take longer than 10 sec
@@ -568,24 +569,19 @@ def recvall(sock, size):
     return buf
 
 
-def print_with_timestamp(string):
-    current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    print('[{}] {}'.format(current_time, string))
-
-
 def generate_dhparam():
-    print_with_timestamp('Since you have enabled bluetooth support for android 4.4 kitkat I will now need to')
-    print_with_timestamp('Generate DH parameters, which is going to take a while')
-    print_with_timestamp('On my laptop (Intel i5) it took ~16 minutes')
+    logging.info('Since you have enabled bluetooth support for android 4.4 kitkat I will now need to')
+    logging.info('Generate DH parameters, which is going to take a while')
+    logging.info('On my laptop (Intel i5) it took ~16 minutes')
     dhparam_process = subprocess.Popen(['openssl', 'dhparam', '-out', DHPARAM_PATH, '4096'],
                                        stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
     stderr = dhparam_process.communicate()[1]
     if dhparam_process.returncode == 0:
-        print_with_timestamp('Generated DH parameters 4096 bit')
-        print_with_timestamp('Saved to: ' + DHPARAM_PATH)
+        logging.info('Generated DH parameters 4096 bit')
+        logging.info('Saved to: ' + DHPARAM_PATH)
     else:
-        print_with_timestamp('Error generating DH parameters, exiting..')
-        print(stderr)
+        logging.error('Error generating DH parameters, exiting..')
+        logging.error(stderr)
         sys.exit(1)
 
 
@@ -596,12 +592,12 @@ def generate_server_private_key_and_certificate(CERTIFICATE_PATH, RSA_PRIVATE_KE
                                        stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
     stderr = openssl_process.communicate()[1]
     if openssl_process.returncode == 0:
-        print_with_timestamp('Generated a 4096 bit RSA private key')
-        print_with_timestamp('Key saved to: ' + RSA_PRIVATE_KEY_PATH)
-        print_with_timestamp('Certificate saved to: ' + CERTIFICATE_PATH)
+        logging.info('Generated a 4096 bit RSA private key')
+        logging.info('Key saved to: ' + RSA_PRIVATE_KEY_PATH)
+        logging.info('Certificate saved to: ' + CERTIFICATE_PATH)
     else:
-        print_with_timestamp('Error generating private key, exiting..')
-        print(stderr)
+        logging.error('Error generating private key, exiting..')
+        logging.error(stderr)
         sys.exit(1)
 
 
@@ -615,11 +611,11 @@ def parse_authorized_certs():
                 ssl.SSLContext(protocol=ssl.PROTOCOL_TLSv1_2).load_verify_locations(cadata=authorized_certs)
                 return authorized_certs
             except Exception as e:
-                print_with_timestamp('Corrupted authorized_certs file: {}'.format(e))
-                print_with_timestamp('Please look at authorized_certs and '
-                                     'search for obvious errors located at {}'.format(AUTHORIZED_CERTS_PATH))
-                print_with_timestamp('Or delete the file altogether, '
-                                     'but then you would have to pair your phone(s) again')
+                logging.error('Corrupted authorized_certs file: {}'.format(e))
+                logging.error('Please look at authorized_certs and '
+                              'search for obvious errors located at {}'.format(AUTHORIZED_CERTS_PATH))
+                logging.error('Or delete the file altogether, '
+                              'but then you would have to pair your phone(s) again')
                 return b''
     else:
         return b''
@@ -641,9 +637,9 @@ def add_to_authorized_certs(cert_der):
             f.write(''.join([first_char_to_write, 'SHA256:', ':'.join(sha256_format),
                              ' ', base64.b64encode(cert_der).decode(), '\n']))
 
-        print_with_timestamp('Certificate with fingerprint: {} saved successfully'.format(' '.join(sha256_format)))
+        logging.info('Certificate with fingerprint: {} saved successfully'.format(' '.join(sha256_format)))
     else:
-        print_with_timestamp('Certificate with fingerprint: {} is already in authorized_certs'.format(' '.join(sha256_format)))
+        logging.info('Certificate with fingerprint: {} is already in authorized_certs'.format(' '.join(sha256_format)))
 
 
 def create_default_config_file_and_exit():
@@ -676,9 +672,9 @@ def create_default_config_file_and_exit():
     config_parser.set('notification', 'keywords_to_ignore', '')
     with open(CONF_FILE_PATH, 'w') as configfile:
         config_parser.write(configfile)
-    print_with_timestamp('Created new default configuration file at "{}"'.format(CONF_FILE_PATH))
-    print_with_timestamp('Exiting... (why?) so you can look at and edit the configuration file, '
-                         'after that run this program again')
+    logging.info('Created new default configuration file at "{}"'.format(CONF_FILE_PATH))
+    logging.info('Exiting... (why?) so you can look at and edit the configuration file, '
+                 'after that run this program again')
     sys.exit()
 
 
@@ -692,7 +688,7 @@ def parse_config_or_create_new():
             tcp_server_enabled = config_parser.getboolean('tcp', 'tcp_server')
             tcp_port_number = config_parser.getint('tcp', 'tcp_port')
             if tcp_port_number < 0 or tcp_port_number > 65535:
-                print('Invalid port, port must be 0-65535')
+                logging.error('Invalid port, port must be 0-65535')
                 sys.exit(1)
             bluetooth_server_enabled = config_parser.getboolean('bluetooth', 'bluetooth_server')
             notification_timeout_milliseconds = config_parser.getint('notification', 'notification_timeout') * 1000
@@ -714,20 +710,20 @@ def parse_config_or_create_new():
                 bluetooth_support_kitkat = config_parser.getboolean('bluetooth', 'bluetooth_support_kitkat')
             except (configparser.Error, ValueError):
                 bluetooth_support_kitkat = False
-                print_with_timestamp('Cound not find setting "bluetooth_support_kitkat" in your config file')
-                print_with_timestamp('This is a new setting that has been added')
-                print_with_timestamp('For now I will keep an2linux running and set this setting to off')
-                print_with_timestamp('If you do not wan\'t to see these messages or you want to enable this setting')
-                print_with_timestamp('Then turn off an2linux and rename or delete your current config file')
-                print_with_timestamp('Located at: "{}"'.format(CONF_FILE_PATH))
-                print_with_timestamp('Then start an2linux again to generate a new config file including this setting')
+                logging.info('Cound not find setting "bluetooth_support_kitkat" in your config file')
+                logging.info('This is a new setting that has been added')
+                logging.info('For now I will keep an2linux running and set this setting to off')
+                logging.info('If you do not wan\'t to see these messages or you want to enable this setting')
+                logging.info('Then turn off an2linux and rename or delete your current config file')
+                logging.info('Located at: "{}"'.format(CONF_FILE_PATH))
+                logging.info('Then start an2linux again to generate a new config file including this setting')
             return tcp_server_enabled, tcp_port_number,\
                    bluetooth_server_enabled, bluetooth_support_kitkat, notification_timeout_milliseconds
         except (configparser.Error, ValueError) as e:
-            print_with_timestamp('Corrupted configuration file: {}'.format(e))
+            logging.error('Corrupted configuration file: {}'.format(e))
             try:
                 os.rename(CONF_FILE_PATH, CONF_FILE_PATH + ".corrupted")
-                print_with_timestamp('Your corrupted configuration file has been saved to "{}"'
+                logging.error('Your corrupted configuration file has been saved to "{}"'
                                      .format(CONF_FILE_PATH + '.corrupted'))
             except Exception:
                 pass
@@ -783,27 +779,50 @@ def init():
                                                                           RSA_PRIVATE_KEY_PATH)
             ssl.PEM_cert_to_DER_cert(open(CERTIFICATE_PATH, 'r').read())
         except (ssl.SSLError, ValueError) as e:
-            print_with_timestamp('Something went wrong trying to load your private key and certificate: {}'.format(e))
-            print_with_timestamp('Will generate new key overwriting old key and certificate')
+            logging.error('Something went wrong trying to load your private key and certificate: {}'.format(e))
+            logging.error('Will generate new key overwriting old key and certificate')
             generate_server_private_key_and_certificate(CERTIFICATE_PATH, RSA_PRIVATE_KEY_PATH)
 
     return CONF_FILE_PATH, CERTIFICATE_PATH, RSA_PRIVATE_KEY_PATH, AUTHORIZED_CERTS_PATH, DHPARAM_PATH, TMP_DIR_PATH
 
 
+def configure_logging():
+    log_folder =  os.path.join(os.environ.get('XDG_CACHE_HOME', os.path.expanduser('~/.cache')), 'an2linux')
+    if not os.path.exists(log_folder):
+        os.makedirs(log_folder, exist_ok=True)
+    log_filename = 'an2linux_{0}.log'.format(dt.datetime.now().strftime('%Y%m%d_%Hh%Mm%Ss'))
+    log_filepath = os.path.join(log_folder, log_filename)
+    
+    # an2linux currently prints to stdout - we will keep this behaviour for now
+    logging.basicConfig(
+        level=logging.INFO,
+        log_format = logging.Formatter(
+            fmt='%(asctime)s.%(msecs).03d %(name)-12s %(levelname)-8s %(message)s (%(filename)s:%(lineno)d)',
+            datefmt='%Y-%m-%d %H:%M:%S'
+        ),
+        handlers=[
+            logging.FileHandler(log_filepath),
+            logging.StreamHandler(sys.stdout),
+        ]
+    )
+
+
 if __name__ == '__main__':
+    configure_logging()
+    
     CONF_FILE_PATH, CERTIFICATE_PATH, RSA_PRIVATE_KEY_PATH, AUTHORIZED_CERTS_PATH, DHPARAM_PATH, TMP_DIR_PATH = init()
 
     tcp_server_enabled, tcp_port_number, bluetooth_server_enabled, bluetooth_support_kitkat,\
         notification_timeout_milliseconds = parse_config_or_create_new()
 
     if not tcp_server_enabled and not bluetooth_server_enabled:
-        print_with_timestamp('Neither TCP nor Bluetooth is enabled in your config file at {}'.format(CONF_FILE_PATH))
+        logging.error('Neither TCP nor Bluetooth is enabled in your config file at {}'.format(CONF_FILE_PATH))
         sys.exit()
 
     SERVER_CERT_DER = ssl.PEM_cert_to_DER_cert(open(CERTIFICATE_PATH, 'r').read())
     sha256 = hashlib.sha256(SERVER_CERT_DER).hexdigest().upper()
     sha256_format = [sha256[x:x + 2] for x in range(0, len(sha256), 2)]
-    print_with_timestamp('Server certificate fingerprint: {}'.format(' '.join(sha256_format)))
+    logging.info('Server certificate fingerprint: {}'.format(' '.join(sha256_format)))
 
     PAIR_REQUEST = b'\x00'
     NOTIF_CONN = b'\x01'
@@ -825,9 +844,9 @@ if __name__ == '__main__':
             # test if ipv4/ipv6 dual stacking is supported, otherwise use ipv4
             tcp_server = ThreadingDualStackServer(('', tcp_port_number), TCPHandler)
         except Exception:
-            print_with_timestamp('(TCP) Failed to use IPv4/IPv6 dual stacking, fallbacks to IPv4 only')
+            logging.error('(TCP) Failed to use IPv4/IPv6 dual stacking, fallbacks to IPv4 only')
             tcp_server = socketserver.ThreadingTCPServer(('', tcp_port_number), TCPHandler)
-        print_with_timestamp('(TCP) Waiting for connections on port {}'.format(tcp_port_number))
+        logging.info('(TCP) Waiting for connections on port {}'.format(tcp_port_number))
         threading.Thread(target=tcp_server.serve_forever).start()
 
     if bluetooth_server_enabled:
@@ -841,8 +860,8 @@ if __name__ == '__main__':
                         # try if valid dh parameters
                         ssl.SSLContext(protocol=ssl.PROTOCOL_TLSv1_2).load_dh_params(DHPARAM_PATH)
                     except Exception as e:
-                        print_with_timestamp('Something went wrong trying to load your DH parameters: {}'.format(e))
-                        print_with_timestamp('Will generate new parameters overwriting old parameters')
+                        logging.error('Something went wrong trying to load your DH parameters: {}'.format(e))
+                        logging.error('Will generate new parameters overwriting old parameters')
                         generate_dhparam()
                 notif_tls_ctx_kitkat_bt = ssl.SSLContext(protocol=ssl.PROTOCOL_TLSv1)
                 notif_tls_ctx_kitkat_bt.load_cert_chain(CERTIFICATE_PATH, RSA_PRIVATE_KEY_PATH)
@@ -852,13 +871,12 @@ if __name__ == '__main__':
                 notif_tls_ctx_kitkat_bt.verify_mode = ssl.CERT_REQUIRED
 
             bluetooth_server = ThreadingBluetoothServer()
-            print_with_timestamp('(Bluetooth) Waiting for connections on RFCOMM channel {}'
+            logging.info('(Bluetooth) Waiting for connections on RFCOMM channel {}'
                                  .format(bluetooth_server.port))
             threading.Thread(target=bluetooth_server.serve_forever).start()
         except ImportError as e:
             bluetooth_server_enabled = False
-            print_with_timestamp('Dependency missing: python-bluez')
-            print(e)
+            logging.error('Dependency missing: python-bluez')
 
     # so we can recieve callbacks from notifications being closed
     main_loop = GLib.MainLoop()
