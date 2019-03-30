@@ -163,7 +163,7 @@ a popular easy-to-use firewall for Linux is Uncomplicated Firewall (ufw)
     - $ `sudo systemctl start ufw; sudo systemctl enable ufw`
 3. set your mobile device's LAN ip to a static ip
     - in the WiFi settings, long press the network you're connected to and tap "modify network"
-    - if you're authentication is required and you're authenticated already leave the password feild empty
+    - if authentication is required (it should) and you're authenticated already leave the password feild empty
     - (Google it for the rest of steps, which depend on your region/router for the Gateway address)
 4. allow traffic limited to one port, from your mobile device's LAN static ip
     - $ `sudo ufw allow from <your-mobile-device's-LAN-static-ip> to any port <your-config-port>`
