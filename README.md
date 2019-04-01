@@ -153,6 +153,21 @@ until from API 20+ (Android 5.0+).
 ## Run AN2Linux as a service
 [Init/Service scripts](https://github.com/rootkiwi/an2linuxserver/tree/master/init)
 
+## Security with a firewall
+a popular easy-to-use firewall for Linux is Uncomplicated Firewall (ufw)
+
+1. install it:
+    - on Arch: $ `sudo pacman -S ufw`
+    - on Debian/Ubuntu: $ `sudo apt-get install ufw`
+2. start and enable ufw’s systemd unit:
+    - $ `sudo systemctl start ufw; sudo systemctl enable ufw`
+3. set your mobile device's LAN ip to a static ip
+    - in the WiFi settings, long press the network you're connected to and tap "modify network"
+    - if authentication is required (it should) and you're authenticated already leave the password feild empty
+    - (Google it for the rest of steps, which depend on your region/router for the Gateway address)
+4. allow traffic limited to one port, from your mobile device's LAN static ip
+    - $ `sudo ufw allow from <your-mobile-device's-LAN-static-ip> to any port <your-config-port>`
+
 ## License
 [GNU General Public License 3](https://www.gnu.org/licenses/gpl-3.0.html),
 with the additional special 
