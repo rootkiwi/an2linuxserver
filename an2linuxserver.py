@@ -83,6 +83,7 @@ class Notification:
             Notify.init('AN2Linux')
             self.notif = Notify.Notification.new(self.title, self.message, self.icon_path)
             self.notif.set_timeout(notification_timeout_milliseconds)
+            self.notif.set_hint('desktop-entry', GLib.Variant('s', 'an2linux'))
             if self.icon_tmp_file is not None:
                 Notification.active_notifications_with_icons.append(self)
                 self.notif.connect('closed', self.closed_callback)
