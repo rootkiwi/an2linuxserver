@@ -46,15 +46,13 @@ import base64
 import select
 from collections import deque
 
-def chkflags(flags, flag):
-    return flags & flag == flag
 
 class Notification:
 
-    # this is is a deque of the latest notifications hash to be able to skip duplicates
+    # this is a deque of the latest notifications hash to be able to skip duplicates
     latest_notifications = None
 
-    # this is a list of notification titles to ignore latest_notifications list
+    # this is a list of notification titles that ignore the latest_notifications list
     titles_that_ignore_latest = None
 
     # list of keywords that trigger notifcation to be ignored
@@ -557,6 +555,10 @@ class BluetoothHandler:
                 Notification(title, message, hashlib.sha256(title.encode() + message.encode()).digest()).show()
         else:
             Notification(title, message, hashlib.sha256(title.encode() + message.encode()).digest()).show()
+
+
+def chkflags(flags, flag):
+    return flags & flag == flag
 
 
 def recvall(sock, size):
