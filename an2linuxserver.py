@@ -28,16 +28,21 @@ except (ImportError, ValueError) as e:
     print('Dependency missing: libnotify')
     print(e)
     sys.exit(1)
+try:
+    gi.require_version('GdkPixbuf', '2.0')
+    from gi.repository import GdkPixbuf
+except (ImportError, ValueError) as e:
+    print('Dependency missing: GdkPixbuf')
+    print(e)
+    sys.exit(1)
 import threading
 import datetime
 import os
 import configparser
 import struct
-import tempfile
 import socketserver
 import socket
 import signal
-import shutil
 import time
 import subprocess
 import hashlib
@@ -58,44 +63,31 @@ class Notification:
     # list of keywords that trigger notifcation to be ignored
     keywords_to_ignore = None
 
-    '''this is to keep a list of active Notification objects with icons to avoid being garbage collected
-    because when a Notification object is garbage collected the TemporaryFile is destroyed
-    and atleast with dunst notification daemon with stacked notifications when an icon file
-    is removed from filesystem the icon gets removed from all currently visible stacked notifications'''
-    active_notifications_with_icons = []
-
-    def __init__(self, title, message, notif_hash, icon_tmp_file=None):
+    def __init__(self, title, message, icon_bytes=None):
         self.title = title
         self.message = message
-        self.notif_hash = notif_hash
-        self.icon_tmp_file = icon_tmp_file
-        self.icon_path = ''
-        if self.icon_tmp_file is not None:
-            self.icon_path = icon_tmp_file.name
+        self.icon_bytes = icon_bytes
+        self.notif_hash = hashlib.sha256(title.encode() + message.encode()
+                                         + icon_bytes if icon_bytes is not None else b'').digest()
 
     def show(self):
-        if (self.notif_hash not in Notification.latest_notifications \
-          or self.title in Notification.titles_that_ignore_latest) \
+        if (self.notif_hash not in Notification.latest_notifications
+            or self.title in Notification.titles_that_ignore_latest) \
           and not any(kw in self.title for kw in Notification.keywords_to_ignore if kw != ''):
             Notification.latest_notifications.append(self.notif_hash)
-            Notify.init('AN2Linux')
-            self.notif = Notify.Notification.new(self.title, self.message, self.icon_path)
+            self.notif = Notify.Notification.new(self.title, self.message, '')
             self.notif.set_timeout(notification_timeout_milliseconds)
             self.notif.set_hint('desktop-entry', GLib.Variant('s', 'an2linux'))
-            if self.icon_tmp_file is not None:
-                Notification.active_notifications_with_icons.append(self)
-                self.notif.connect('closed', self.closed_callback)
+            if self.icon_bytes is not None:
+                pixbuf_loader = GdkPixbuf.PixbufLoader.new()
+                pixbuf_loader.write(self.icon_bytes)
+                pixbuf_loader.close()
+                self.notif.set_image_from_pixbuf(pixbuf_loader.get_pixbuf())
             try:
                 self.notif.show()
             except Exception as e:
-                print_with_timestamp('(Notification) Error showing notification:' \
-                        ' {}'.format(e));
-                print_with_timestamp('Please make sure you have a notification' \
-                        ' server installed on your system')
-
-    def closed_callback(self, notif_instance):
-        self.icon_tmp_file.close()
-        Notification.active_notifications_with_icons.remove(self)
+                print_with_timestamp('(Notification) Error showing notification: {}'.format(e))
+                print_with_timestamp('Please make sure you have a notification server installed on your system')
 
 
 class TCPHandler(socketserver.BaseRequestHandler):
@@ -250,17 +242,14 @@ class TCPHandler(socketserver.BaseRequestHandler):
                 message = title_and_or_message.split('|||')[1]
 
         if include_icon:
-            icon_tmp_file = tempfile.NamedTemporaryFile(buffering=0, dir=TMP_DIR_PATH)
             icon_size = struct.unpack('>I', recvall(tls_socket, 4))[0]
-            icon = recvall(tls_socket, icon_size)
+            icon_bytes = recvall(tls_socket, icon_size)
             try:
-                icon_tmp_file.write(icon)
-                Notification(title, message, hashlib.sha256(title.encode() + message.encode() + icon).digest(),
-                             icon_tmp_file).show()
+                Notification(title, message, icon_bytes).show()
             except Exception:
-                Notification(title, message, hashlib.sha256(title.encode() + message.encode()).digest()).show()
+                Notification(title, message).show()
         else:
-            Notification(title, message, hashlib.sha256(title.encode() + message.encode()).digest()).show()
+            Notification(title, message).show()
 
 
 class ThreadingDualStackServer(socketserver.ThreadingTCPServer):
@@ -543,18 +532,15 @@ class BluetoothHandler:
                 message = title_and_or_message.split('|||')[1]
 
         if include_icon:
-            icon_tmp_file = tempfile.NamedTemporaryFile(buffering=0, dir=TMP_DIR_PATH)
             icon_size = struct.unpack('>I', recvall(self.socket, 4))[0]
             icon_encrypted = recvall(self.socket, icon_size)
-            icon = self.tls_decrypt(icon_encrypted)
+            icon_bytes = self.tls_decrypt(icon_encrypted)
             try:
-                icon_tmp_file.write(icon)
-                Notification(title, message, hashlib.sha256(title.encode() + message.encode() + icon).digest(),
-                             icon_tmp_file).show()
+                Notification(title, message, icon_bytes).show()
             except Exception:
-                Notification(title, message, hashlib.sha256(title.encode() + message.encode()).digest()).show()
+                Notification(title, message).show()
         else:
-            Notification(title, message, hashlib.sha256(title.encode() + message.encode()).digest()).show()
+            Notification(title, message).show()
 
 
 def chkflags(flags, flag):
@@ -738,6 +724,7 @@ def parse_config_or_create_new():
 
 
 def cleanup(signum, frame):
+    Notify.uninit()
     if tcp_server_enabled:
         tcp_server.shutdown()
         if TCPHandler.active_pairing_connection:
@@ -748,9 +735,6 @@ def cleanup(signum, frame):
         if BluetoothHandler.active_pairing_connection:
             BluetoothHandler.cancel_pairing = True
 
-    shutil.rmtree(TMP_DIR_PATH, ignore_errors=True)
-
-    main_loop.quit()
     sys.exit()
 
 
@@ -768,14 +752,8 @@ def init():
     AUTHORIZED_CERTS_PATH = os.path.join(CONF_DIR_PATH, 'authorized_certs')
     DHPARAM_PATH = os.path.join(CONF_DIR_PATH, 'dhparam.pem')
 
-    TMP_DIR_BASE = os.getenv('XDG_RUNTIME_DIR', tempfile.gettempdir())
-    TMP_DIR_PATH = os.path.join(TMP_DIR_BASE, 'an2linux')
-
     if not os.path.exists(CONF_DIR_PATH):
         os.makedirs(CONF_DIR_PATH)
-
-    if not os.path.exists(TMP_DIR_PATH):
-        os.makedirs(TMP_DIR_PATH)
 
     if not os.path.isfile(CERTIFICATE_PATH) or not os.path.isfile(RSA_PRIVATE_KEY_PATH):
         generate_server_private_key_and_certificate(CERTIFICATE_PATH, RSA_PRIVATE_KEY_PATH)
@@ -790,11 +768,11 @@ def init():
             print_with_timestamp('Will generate new key overwriting old key and certificate')
             generate_server_private_key_and_certificate(CERTIFICATE_PATH, RSA_PRIVATE_KEY_PATH)
 
-    return CONF_FILE_PATH, CERTIFICATE_PATH, RSA_PRIVATE_KEY_PATH, AUTHORIZED_CERTS_PATH, DHPARAM_PATH, TMP_DIR_PATH
+    return CONF_FILE_PATH, CERTIFICATE_PATH, RSA_PRIVATE_KEY_PATH, AUTHORIZED_CERTS_PATH, DHPARAM_PATH
 
 
 if __name__ == '__main__':
-    CONF_FILE_PATH, CERTIFICATE_PATH, RSA_PRIVATE_KEY_PATH, AUTHORIZED_CERTS_PATH, DHPARAM_PATH, TMP_DIR_PATH = init()
+    CONF_FILE_PATH, CERTIFICATE_PATH, RSA_PRIVATE_KEY_PATH, AUTHORIZED_CERTS_PATH, DHPARAM_PATH = init()
 
     tcp_server_enabled, tcp_port_number, bluetooth_server_enabled, bluetooth_support_kitkat,\
         notification_timeout_milliseconds = parse_config_or_create_new()
@@ -802,6 +780,9 @@ if __name__ == '__main__':
     if not tcp_server_enabled and not bluetooth_server_enabled:
         print_with_timestamp('Neither TCP nor Bluetooth is enabled in your config file at {}'.format(CONF_FILE_PATH))
         sys.exit()
+
+    # initialize libnotify
+    Notify.init('AN2Linux')
 
     SERVER_CERT_DER = ssl.PEM_cert_to_DER_cert(open(CERTIFICATE_PATH, 'r').read())
     sha256 = hashlib.sha256(SERVER_CERT_DER).hexdigest().upper()
@@ -862,10 +843,6 @@ if __name__ == '__main__':
             bluetooth_server_enabled = False
             print_with_timestamp('Dependency missing: python-bluez')
             print(e)
-
-    # so we can recieve callbacks from notifications being closed
-    main_loop = GLib.MainLoop()
-    threading.Thread(target=main_loop.run).start()
 
     signal.signal(signal.SIGHUP, cleanup)
     signal.signal(signal.SIGINT, cleanup)
