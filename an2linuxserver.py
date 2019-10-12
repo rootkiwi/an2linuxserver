@@ -773,16 +773,14 @@ def configure_logging():
     log_folder =  os.path.join(os.environ.get('XDG_CACHE_HOME', os.path.expanduser('~/.cache')), 'an2linux')
     if not os.path.exists(log_folder):
         os.makedirs(log_folder, exist_ok=True)
-    log_filename = 'an2linux_{0}.log'.format(dt.datetime.now().strftime('%Y%m%d_%Hh%Mm%Ss'))
+    log_filename = 'an2linux_{0}.log'.format(datetime.datetime.now().strftime('%Y%m%d_%Hh%Mm%Ss'))
     log_filepath = os.path.join(log_folder, log_filename)
 
     # an2linux currently prints to stdout - we will keep this behaviour for now
     logging.basicConfig(
         level=logging.INFO,
-        log_format = logging.Formatter(
-            fmt='%(asctime)s.%(msecs).03d %(name)-12s %(levelname)-8s %(message)s (%(filename)s:%(lineno)d)',
-            datefmt='%Y-%m-%d %H:%M:%S'
-        ),
+        format='%(asctime)s.%(msecs).03d %(name)-12s %(levelname)-8s %(message)s (%(filename)s:%(lineno)d)',
+        datefmt='%Y-%m-%d %H:%M:%S',
         handlers=[
             logging.FileHandler(log_filepath),
             logging.StreamHandler(sys.stdout),
