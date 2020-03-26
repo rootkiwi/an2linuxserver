@@ -65,8 +65,9 @@ class Notification:
     # list of keywords that trigger notifcation to be ignored
     keywords_to_ignore = None
     
-    #regexes of contents of notifications to be ignored
-    regexes_to_ignore = None
+    #regexes of title and contents of notifications to be ignored
+    regexes_to_ignore_in_title = None
+    regexes_to_ignore_in_content = None
 
     def __init__(self, title, message, icon_bytes=None):
         self.title = title
@@ -79,7 +80,8 @@ class Notification:
         if (self.notif_hash not in Notification.latest_notifications
             or self.title in Notification.titles_that_ignore_latest) \
           and not any(kw in self.title for kw in Notification.keywords_to_ignore if kw != '') \
-          and not any(regex.match(self.message) for regex in Notification.regexes_to_ignore):
+          and not any(regex.match(self.title) for regex in Notification.regexes_to_ignore_in_title) \
+          and not any(regex.match(self.message) for regex in Notification.regexes_to_ignore_in_content):
             Notification.latest_notifications.append(self.notif_hash)
             self.notif = Notify.Notification.new(self.title, self.message, '')
             self.notif.set_timeout(notification_timeout_milliseconds)
@@ -666,8 +668,9 @@ def create_default_config_file_and_exit():
     config_parser.set('notification', '\n# keywords_to_ignore: do not show notifications that include these keywords in the notification titles')
     config_parser.set('notification', '# comma-separated, case-sensitive. leading and trailing whitespace will be stripped.')
     config_parser.set('notification', 'keywords_to_ignore', '')
-    config_parser.set('notification', '\n# regexes_to_ignore: do not show notifications who\'s contents match the following regexes')
-    config_parser.set('notification', 'regexes_to_ignore', '')
+    config_parser.set('notification', '\n# regexes_to_ignore: do not show notifications who\'s contents or title match the following regexes')
+    config_parser.set('notification', 'regexes_to_ignore_in_title', '')
+    config_parser.set('notification', 'regexes_to_ignore_in_content', '')
     with open(CONF_FILE_PATH, 'w') as configfile:
         config_parser.write(configfile)
     logging.info('Created new default configuration file at "{}"'.format(CONF_FILE_PATH))
@@ -704,8 +707,12 @@ def parse_config_or_create_new():
             keywords_to_ignore = config_parser.get('notification', 'keywords_to_ignore')
             Notification.keywords_to_ignore = [kw.strip() for kw in keywords_to_ignore.split(',')]
             
-            regexes_to_ignore = config_parser.get('notification', 'regexes_to_ignore')
-            Notification.regexes_to_ignore = [re.compile(kw.strip()) for kw in regexes_to_ignore.split(',')]
+            regexes_to_ignore_in_title = config_parser.get('notification', 'regexes_to_ignore_in_title')
+            Notification.regexes_to_ignore_in_title = [re.compile(kw.strip()) for kw in regexes_to_ignore_in_title.split(',')] if regexes_to_ignore_in_title else []
+
+            regexes_to_ignore_in_content = config_parser.get('notification', 'regexes_to_ignore_in_content')
+            Notification.regexes_to_ignore_in_content = [re.compile(kw.strip()) for kw in regexes_to_ignore_in_content.split(',')] if regexes_to_ignore_in_content else []
+
 
             try:
                 bluetooth_support_kitkat = config_parser.getboolean('bluetooth', 'bluetooth_support_kitkat')
