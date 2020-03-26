@@ -65,7 +65,7 @@ class Notification:
     # list of keywords that trigger notifcation to be ignored
     keywords_to_ignore = None
     
-    #regexes of titles of notifications to be ignored
+    #regexes of contents of notifications to be ignored
     regexes_to_ignore = None
 
     def __init__(self, title, message, icon_bytes=None):
