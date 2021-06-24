@@ -132,7 +132,7 @@ AN2Linux will generate a 4096 bit RSA key `rsakey.pem`  and a self-signed certif
 
 Just delete those and restart AN2Linux if you want to generate a new key and certificate.
 
-#### Trused certificates
+#### Trusted certificates
 After a successful certificate exchange AN2linux will create a file named
 `authorized_certs`.
 
