@@ -166,7 +166,7 @@ a popular easy-to-use firewall for Linux is Uncomplicated Firewall (ufw)
     - if authentication is required (it should) and you're authenticated already leave the password feild empty
     - (Google it for the rest of steps, which depend on your region/router for the Gateway address)
 4. allow traffic limited to one port, from your mobile device's LAN static ip
-    - $ `sudo ufw allow from <your-mobile-device's-LAN-static-ip> to any port <your-config-port>`
+    - $ `sudo ufw allow from <your-mobile-device's-LAN-static-ip> to <your-server-device's-LAN-static-ip> port <your-config-port>`
 
 ## License
 [GNU General Public License 3](https://www.gnu.org/licenses/gpl-3.0.html),
